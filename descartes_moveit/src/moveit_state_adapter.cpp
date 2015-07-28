@@ -321,8 +321,8 @@ bool MoveitStateAdapter::isValid(const std::vector<double> &joint_pose) const
     robot_state_->setJointGroupPositions(group_name_, joint_pose);
     //TODO: At some point velocities and accelerations should be set for the group as
     //well.
-    robot_state_->setVariableVelocities(std::vector<double>(joint_pose.size(), 0.));
-    robot_state_->setVariableAccelerations(std::vector<double>(joint_pose.size(), 0.));
+    robot_state_->setVariableVelocities(std::vector<double>(robot_state_->getVariableCount(), 0.));
+    robot_state_->setVariableAccelerations(std::vector<double>(robot_state_->getVariableCount(), 0.));
     if (robot_state_->satisfiesBounds())
     {
       rtn = true;
