@@ -25,6 +25,7 @@
 #include "moveit/robot_model/robot_model.h"
 #include "moveit/kinematics_base/kinematics_base.h"
 #include <moveit/planning_scene/planning_scene.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <string>
 
 namespace descartes_moveit
@@ -56,6 +57,8 @@ public:
 
   virtual bool initialize(const std::string& robot_description, const std::string& group_name,
                           const std::string& world_frame,const std::string& tcp_frame);
+
+  virtual bool updateScene();
 
   virtual bool getIK(const Eigen::Affine3d &pose, const std::vector<double> &seed_state,
                      std::vector<double> &joint_pose) const;
@@ -124,9 +127,10 @@ protected:
 
   std::vector<double> velocity_limits_;
   mutable moveit::core::RobotStatePtr robot_state_;
+  planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
   planning_scene::PlanningScenePtr planning_scene_;
-  robot_model_loader::RobotModelLoaderPtr  robot_model_loader_;
-  robot_model::RobotModelConstPtr robot_model_ptr_;
+/*  robot_model_loader::RobotModelLoaderPtr  robot_model_loader_;
+  robot_model::RobotModelConstPtr robot_model_ptr_;*/
 
   /**
    * @brief Vector of starting configurations for the numerical solver

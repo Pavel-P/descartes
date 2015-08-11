@@ -115,14 +115,26 @@ MoveitStateAdapter::MoveitStateAdapter(const moveit::core::RobotState & robot_st
   return;
 }
 
+bool MoveitStateAdapter::updateScene()
+{
+  if (!planning_scene_monitor_->requestPlanningSceneState())
+  {
+      logWarn("Could not update planning scene");
+      return false;
+  }
+  planning_scene_monitor::LockedPlanningSceneRW planning_scene_RW(planning_scene_monitor_);
+  planning_scene_RW->getCurrentStateNonConst().update();
+  planning_scene_ = planning_scene_RW->diff();
+  robot_state_.reset(new robot_state::RobotState(planning_scene_->getCurrentState()));
+  return true;
+}
+
 bool MoveitStateAdapter::initialize(const std::string& robot_description, const std::string& group_name,
                                     const std::string& world_frame,const std::string& tcp_frame)
 {
+  planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor(robot_description));
+  this->updateScene();
 
-  robot_model_loader_.reset(new robot_model_loader::RobotModelLoader(robot_description));
-  robot_model_ptr_ = robot_model_loader_->getModel();
-  robot_state_.reset(new moveit::core::RobotState(robot_model_ptr_));
-  planning_scene_.reset(new planning_scene::PlanningScene(robot_model_loader_->getModel()));
   group_name_ = group_name;
   tool_frame_ = tcp_frame;
   world_frame_ = world_frame;
