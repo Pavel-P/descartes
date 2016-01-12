@@ -29,11 +29,10 @@
 #include <Eigen/Geometry>
 #include <eigen_stl_containers/eigen_stl_vector_container.h>
 #include <vector>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include "descartes_core/robot_model.h"
-#include "descartes_core/trajectory_pt_transition.h"
 
+#include "descartes_core/robot_model.h"
+#include "descartes_core/trajectory_id.h"
+#include "descartes_core/trajectory_timing_constraint.h"
 
 namespace descartes_core
 {
@@ -71,8 +70,13 @@ DESCARTES_CLASS_FORWARD(TrajectoryPt);
 class TrajectoryPt
 {
 public:
-  typedef boost::uuids::uuid ID;
-  TrajectoryPt() : id_(boost::uuids::random_generator()()) {}
+  typedef TrajectoryID ID;
+
+  TrajectoryPt(const TimingConstraint& timing) 
+    : id_(TrajectoryID::make_id())
+    , timing_(timing)
+  {}
+  
   virtual ~TrajectoryPt() {}
 
   /**@name Getters for Cartesian pose(s)
@@ -170,19 +174,61 @@ public:
   }
   /** @} (end section) */
 
-  /**@brief Clones a trajectory point.  Performs a copy operation and then creates a new ID
-   * @param clone A copy of this trajectory point with a different ID
+  /**
+   * @brief Makes a copy of the underlying trajectory point and returns a polymorphic handle to it
+   * @return A copy, with the same ID, of the underlying point type
    */
-  virtual void cloneTo(TrajectoryPt &clone) const
+  virtual TrajectoryPtPtr copy() const = 0;
+
+  /**
+   * @brief Makes a copy of the underlying trajectory point, mutates the timing, and returns a
+   *        polymorphic handle to it.
+   * @param tm The new timing value for the copied point
+   * @return A copy, with the same ID and new timing, of the underlying point type
+   */
+  virtual TrajectoryPtPtr copyAndSetTiming(const TimingConstraint& tm) const
   {
-    clone = *this;
-    clone.setID(boost::uuids::random_generator()());
+    TrajectoryPtPtr cp = copy();
+    cp->setTiming(tm);
+    return cp;
   }
 
+  /**
+   * @brief Makes a clone of the underlying trajectory point and returns a polymorphic handle to it
+   * @return A clone, with the same data but a unique ID, of the underlying point type
+   */
+  virtual TrajectoryPtPtr clone() const
+  {
+    TrajectoryPtPtr cp = copy();
+    cp->setID(TrajectoryID::make_id());
+    return cp;
+  }
+
+  /**
+   * @brief Makes a clone of the underlying trajectory point and returns a polymorphic handle to it with new timing
+   * @param tm The new timing value for the copied point
+   * @return A clone, with the same data but a unique ID, of the underlying point type with new timing
+   */
+  virtual TrajectoryPtPtr cloneAndSetTiming(const TimingConstraint& tm) const
+  {
+    TrajectoryPtPtr cp = clone();
+    cp->setTiming(tm);
+    return cp;
+  }
+
+  const TimingConstraint& getTiming() const
+  {
+    return timing_;
+  }
+
+  void setTiming(const TimingConstraint& timing)
+  {
+    timing_ = timing;
+  }
 
 protected:
-  ID                            id_;                    /**<@brief ID associated with this pt. Generally refers back to a process path defined elsewhere. */
-  TrajectoryPtTransitionPtr     transition_;            /**<@brief Velocities at, and interpolation method to reach this point **/
+  ID                    id_;      /**<@brief ID associated with this pt. Generally refers back to a process path defined elsewhere. */
+  TimingConstraint      timing_;  /**<@brief Information specifying acceptable timing from this point to the next. */
 
 };
 

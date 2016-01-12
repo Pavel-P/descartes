@@ -44,8 +44,12 @@ add_library(descartes_trajectory
             src/cart_trajectory_pt.cpp
             src/joint_trajectory_pt.cpp
             src/trajectory.cpp
+#<<<<<<< HEAD
             src/trajectory_segment.cpp
             src/cartesian_interpolator.cpp
+#=======
+            src/axial_symmetric_pt.cpp
+#>>>>>>> indigo-devel
             test/cartesian_robot.cpp
 )
 
@@ -53,9 +57,18 @@ target_link_libraries(descartes_trajectory
                       ${catkin_LIBRARIES}
 )
 
+
 #############
 ## Install ##
 #############
+
+install(
+    TARGETS ${PROJECT_NAME} 
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
+
+install(
+    DIRECTORY include/${PROJECT_NAME}/
+    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 
 
 #############
@@ -69,7 +82,11 @@ if(CATKIN_ENABLE_TESTING)
       test/joint_trajectory_pt.cpp
       test/cartesian_robot.cpp
       test/cartesian_robot_test.cpp
-      test/cartesian_interpolator.cpp)
+#<<<<<<< HEAD
+      test/cartesian_interpolator.cpp
+#=======
+      test/axial_symmetric_pt.cpp)
+#>>>>>>> indigo-devel
   catkin_add_gtest(${PROJECT_NAME}_utest ${UTEST_SRC_FILES})
   target_link_libraries(${PROJECT_NAME}_utest descartes_trajectory)
 

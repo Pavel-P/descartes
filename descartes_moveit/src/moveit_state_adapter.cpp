@@ -21,33 +21,71 @@
 #include "eigen_conversions/eigen_msg.h"
 #include "random_numbers/random_numbers.h"
 #include "descartes_core/pretty_print.hpp"
+#include "descartes_moveit/seed_search.h"
 #include <sstream>
 
 const static int SAMPLE_ITERATIONS = 10;
 
+namespace
+{
+
+bool getJointVelocityLimits(const moveit::core::RobotState& state,
+                            const std::string& group_name,
+                            std::vector<double>& output)
+{
+  std::vector<double> result;
+
+  auto models = state.getJointModelGroup(group_name)->getActiveJointModels();
+  for (const moveit::core::JointModel* model : models)
+  {
+    const auto& bounds = model->getVariableBounds();
+    // Check to see if there is a single bounds constraint (more might indicate
+    // not revolute joint)
+    if (model->getType() != moveit::core::JointModel::REVOLUTE &&
+        model->getType() != moveit::core::JointModel::PRISMATIC)
+    {
+      ROS_ERROR_STREAM(__FUNCTION__ << " Unexpected joint type. Currently works only with single axis prismatic or revolute joints.");
+      return false;
+    }
+    else
+    {
+      result.push_back(bounds[0].max_velocity_);
+    }
+  }
+
+  output = result;
+  return true;
+}
+
+} // end anon namespace
+
 namespace descartes_moveit
 {
 
-MoveitStateAdapter::MoveitStateAdapter():
-    sample_iterations_(SAMPLE_ITERATIONS)
-{
-
-}
+MoveitStateAdapter::MoveitStateAdapter()
+{}
 
 MoveitStateAdapter::MoveitStateAdapter(const moveit::core::RobotState & robot_state, const std::string & group_name,
-                                     const std::string & tool_frame, const std::string & world_frame,
-                                       const size_t sample_iterations) :
+                                       const std::string & tool_frame, const std::string & world_frame) :
   robot_state_(new moveit::core::RobotState(robot_state)),
   group_name_(group_name),
   tool_frame_(tool_frame),
   world_frame_(world_frame),
-  sample_iterations_(sample_iterations),
   world_to_root_(Eigen::Affine3d::Identity())
 {
-  moveit::core::RobotModelConstPtr robot_model_ = robot_state_->getRobotModel();
+
+  ROS_INFO_STREAM("Generated random seeds");
+  seed_states_ = seed::findRandomSeeds(*robot_state_, group_name_, SAMPLE_ITERATIONS);
+
   const moveit::core::JointModelGroup* joint_model_group_ptr = robot_state_->getJointModelGroup(group_name);
   if (joint_model_group_ptr)
   {
+    // Find the velocity limits
+    if (!getJointVelocityLimits(*robot_state_, group_name, velocity_limits_))
+    {
+      logWarn("Could not determine velocity limits of RobotModel from MoveIt");
+    }
+
     joint_model_group_ptr->printGroupInfo();
 
     const std::vector<std::string>& link_names = joint_model_group_ptr->getLinkModelNames();
@@ -89,6 +127,18 @@ bool MoveitStateAdapter::initialize(const std::string& robot_description, const 
   tool_frame_ = tcp_frame;
   world_frame_ = world_frame;
 
+  if (seed_states_.empty())
+  {
+    seed_states_ = seed::findRandomSeeds(*robot_state_, group_name_, SAMPLE_ITERATIONS);
+    ROS_INFO_STREAM("Generated "<<seed_states_.size()<< " random seeds");
+  }
+
+  // Find the velocity limits
+  if (!getJointVelocityLimits(*robot_state_, group_name, velocity_limits_))
+  {
+    logWarn("Could not determine velocity limits of RobotModel from MoveIt");
+  }
+
   const moveit::core::JointModelGroup* joint_model_group_ptr = robot_state_->getJointModelGroup(group_name);
   if (joint_model_group_ptr)
   {
@@ -104,7 +154,7 @@ bool MoveitStateAdapter::initialize(const std::string& robot_description, const 
     if (world_frame_ != robot_state_->getRobotModel()->getModelFrame())
     {
       logWarn("World frame '%s' does not match model root frame '%s', all poses will be transformed to world frame '%s'",
-               world_frame_.c_str(), link_names.front().c_str(),world_frame_.c_str());
+               world_frame_.c_str(), robot_state_->getRobotModel()->getModelFrame().c_str(),world_frame_.c_str());
 
       Eigen::Affine3d root_to_world = robot_state_->getFrameTransform(world_frame_);
       world_to_root_ = descartes_core::Frame(root_to_world.inverse());
@@ -140,9 +190,9 @@ bool MoveitStateAdapter::getIK(const Eigen::Affine3d &pose, std::vector<double> 
                               tool_frame_))
   {
     robot_state_->copyJointGroupPositions(group_name_, joint_pose);
-    if(isInCollision(joint_pose))
+    if(!isValid(joint_pose))
     {
-      ROS_ERROR_STREAM("Robot is in collision for this pose of the tool '"<<tool_frame_<<"'");
+      ROS_DEBUG_STREAM("Robot joint pose is invalid");
     }
     else
     {
@@ -167,9 +217,9 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d &pose, std::vector<std::
       getSearchDiscretization();
   logDebug("Utilizing an min. difference of %f between IK solutions", epsilon);
   joint_poses.clear();
-  for (size_t sample_iter = 0; sample_iter < sample_iterations_; ++sample_iter)
+  for (size_t sample_iter = 0; sample_iter < seed_states_.size(); ++sample_iter)
   {
-    robot_state_->setToRandomPositions();
+    robot_state_->setJointGroupPositions(group_name_, seed_states_[sample_iter]);
     std::vector<double> joint_pose;
     if (getIK(pose, joint_pose))
     {
@@ -207,15 +257,15 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d &pose, std::vector<std::
       }
     }
   }
-  logDebug("Found %d joint solutions out of %d iterations", joint_poses.size(), sample_iterations_);
+  logDebug("Found %d joint solutions out of %d iterations", joint_poses.size(), seed_states_.size());
   if (joint_poses.empty())
   {
-    logError("Found 0 joint solutions out of %d iterations", sample_iterations_);
+    logError("Found 0 joint solutions out of %d iterations", seed_states_.size());
     return false;
   }
   else
   {
-    logInform("Found %d joint solutions out of %d iterations", joint_poses.size(), sample_iterations_);
+    logInform("Found %d joint solutions out of %d iterations", joint_poses.size(), seed_states_.size());
     return true;
   }
 }
@@ -286,7 +336,7 @@ bool MoveitStateAdapter::isValid(const std::vector<double> &joint_pose) const
 
     if(isInCollision(joint_pose))
     {
-      ROS_INFO_STREAM("Robot is in collision at this joint pose");
+      ROS_DEBUG_STREAM("Robot is in collision at this joint pose");
       rtn = false;
     }
 
@@ -313,6 +363,37 @@ int MoveitStateAdapter::getDOF() const
   const moveit::core::JointModelGroup* group;
   group = robot_state_->getJointModelGroup(group_name_);
   return group->getVariableCount();
+}
+
+bool MoveitStateAdapter::isValidMove(const std::vector<double>& from_joint_pose, 
+                                     const std::vector<double>& to_joint_pose,
+                                     double dt) const
+{
+  std::vector<double> max_joint_deltas;
+  max_joint_deltas.reserve(velocity_limits_.size());
+
+  // Check for equal sized arrays
+  if (from_joint_pose.size() != to_joint_pose.size())
+  {
+    ROS_ERROR_STREAM("To and From joint poses are of different sizes.");
+    return false;
+  }
+
+  // Build a vector of the maximum angle delta per joint 
+  for (std::vector<double>::const_iterator it = velocity_limits_.begin(); it != velocity_limits_.end(); ++it)
+  {
+    max_joint_deltas.push_back((*it) * dt);
+  }
+
+  for (std::vector<double>::size_type i = 0; i < from_joint_pose.size(); ++i)
+  {
+    if ( std::abs(from_joint_pose[i] - to_joint_pose[i]) > max_joint_deltas[i] )
+    {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 } //descartes_moveit

@@ -1,9 +1,13 @@
 <?xml version="1.0"?>
 <package>
   <name>descartes_trajectory</name>
-  <version>0.0.0</version>
+  <version>0.0.1</version>
   <description>The descartes_trajectory package</description>
+  
   <maintainer email="jnicho@swri.org">Jorge Nicho</maintainer>
+  <maintainer email="jonathan.meyer@swri.org">Jonathan Meyer</maintainer>
+  <maintainer email="sedwards@swri.org">Shaun Edwards</maintainer>
+
   <license>Apache2.0</license>
   <author email="jnicho@swri.org">Jorge Nicho</author>
 
@@ -20,5 +24,6 @@
   <run_depend>tf_conversions</run_depend>
 
   <export>
+    <rosdoc config="rosdoc.yaml"/>
   </export>
 </package>

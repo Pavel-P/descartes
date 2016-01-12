@@ -30,6 +30,8 @@
 namespace descartes_moveit
 {
 
+DESCARTES_CLASS_FORWARD(MoveitStateAdapter);
+
 /**@brief MoveitStateAdapter adapts the MoveIt RobotState to the Descartes RobotModel interface
  *
  */
@@ -38,7 +40,6 @@ class MoveitStateAdapter : public descartes_core::RobotModel
 
 
 public:
-
   MoveitStateAdapter();
 
   /**
@@ -49,8 +50,7 @@ public:
    * @param world_frame work object frame name
    */
   MoveitStateAdapter(const moveit::core::RobotState & robot_state, const std::string & group_name,
-                    const std::string & tool_frame, const std::string & world_frame,
-                     size_t sample_iterations = 10);
+                     const std::string & tool_frame, const std::string & world_frame);
 
   virtual ~MoveitStateAdapter()
   {
@@ -71,6 +71,36 @@ public:
   virtual bool isValid(const Eigen::Affine3d &pose) const;
 
   virtual int getDOF() const;
+
+  /**
+   * @brief Set the initial states used for iterative inverse kineamtics
+   * @param seeds Vector of vector of doubles representing joint positions.
+   *              Be sure that it's sized correctly for the DOF.
+   */
+  void setSeedStates(const std::vector<std::vector<double> >& seeds)
+  {
+    seed_states_ = seeds;
+  }
+
+  /**
+   * @brief Retrieves the initial seed states used by iterative inverse kinematic solvers
+   */
+  const std::vector<std::vector<double> >& getSeedStates() const
+  {
+    return seed_states_;
+  }
+
+  /**
+   * @brief Returns the underlying moveit state object so it can be used to generate seeds
+   */
+  moveit::core::RobotStatePtr getState()
+  {
+    return robot_state_;
+  }
+
+  virtual bool isValidMove(const std::vector<double>& from_joint_pose, 
+                           const std::vector<double>& to_joint_pose,
+                           double dt) const;
 
 protected:
 
@@ -94,10 +124,16 @@ protected:
    */
   bool isInCollision(const std::vector<double> &joint_pose) const;
 
+  std::vector<double> velocity_limits_;
   mutable moveit::core::RobotStatePtr robot_state_;
   planning_scene::PlanningScenePtr planning_scene_;
   robot_model_loader::RobotModelLoaderPtr  robot_model_loader_;
   robot_model::RobotModelConstPtr robot_model_ptr_;
+
+  /**
+   * @brief Vector of starting configurations for the numerical solver
+   */
+  std::vector<std::vector<double> > seed_states_;
 
   /**
    * @brief Planning group name
@@ -118,11 +154,6 @@ protected:
    * @brief convenient transformation frame
    */
   descartes_core::Frame world_to_root_;
-
-  /**
-   * @brief Joint solution sample iterations for returning "all" joints
-   */
-  size_t sample_iterations_;
 
 };
 
