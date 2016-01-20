@@ -105,6 +105,10 @@ public:
                            const std::vector<double>& to_joint_pose,
                            double dt) const;
 
+  void setJointWeights(const std::vector<double>& weights);
+  void getJointWeights(std::vector<double>& weights) const;
+
+
 protected:
 
   /**
@@ -128,12 +132,14 @@ protected:
   bool isInCollision(const std::vector<double> &joint_pose) const;
 
   std::vector<double> velocity_limits_;
+  std::vector<double> joint_weights_;
   mutable moveit::core::RobotStatePtr robot_state_;
   planning_scene::PlanningScenePtr planning_scene_;
   robot_model_loader::RobotModelLoaderPtr  robot_model_loader_;
   robot_model::RobotModelConstPtr robot_model_ptr_;
 
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
+
 
   /**
    * @brief Vector of starting configurations for the numerical solver

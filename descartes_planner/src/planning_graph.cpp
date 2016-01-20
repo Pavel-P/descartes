@@ -1009,9 +1009,13 @@ PlanningGraph::LinearWeightResult PlanningGraph::linearWeight(const JointTraject
     }
 
     double vector_diff = 0;
+
+    std::vector<double> joint_weights;
+    robot_model_->getJointWeights(joint_weights);
+
     for (unsigned i = 0; i < start_vector.size(); i++)
     {
-      double joint_diff = std::abs(end_vector[i] - start_vector[i]);
+      double joint_diff = joint_weights[i]*std::abs(end_vector[i] - start_vector[i]);
       vector_diff += joint_diff ;
     }
 

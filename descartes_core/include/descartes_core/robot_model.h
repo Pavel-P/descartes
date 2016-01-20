@@ -131,6 +131,14 @@ public:
   virtual bool isValidMove(const std::vector<double>& from_joint_pose, const std::vector<double>& to_joint_pose,
                            double dt) const = 0;
 
+  virtual void getJointWeights(std::vector<double>& weight) const = 0;
+
+  virtual void setJointWeights(const std::vector<double>& weight) = 0;
+
+  virtual bool updateScene() = 0;
+
+  virtual moveit::core::RobotStatePtr getState() = 0;
+
 protected:
 
   RobotModel(): check_collisions_(false){}

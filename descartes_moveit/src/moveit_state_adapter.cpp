@@ -129,15 +129,19 @@ bool MoveitStateAdapter::updateScene()
   return true;
 }
 
+void MoveitStateAdapter::setJointWeights(const std::vector<double>& weights)
+{
+    joint_weights_ = weights;
+}
+
+void MoveitStateAdapter::getJointWeights(std::vector<double>& weights) const
+{
+    weights = joint_weights_;
+}
+
 bool MoveitStateAdapter::initialize(const std::string& robot_description, const std::string& group_name,
                                     const std::string& world_frame,const std::string& tcp_frame)
 {
-
-/*  robot_model_loader_.reset(new robot_model_loader::RobotModelLoader(robot_description));
-  robot_model_ptr_ = robot_model_loader_->getModel();
-  robot_state_.reset(new moveit::core::RobotState(robot_model_ptr_));
-  planning_scene_.reset(new planning_scene::PlanningScene(robot_model_loader_->getModel()));*/
-
   planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor(robot_description));
   robot_model_loader_ = planning_scene_monitor_->getRobotModelLoader();
   robot_model_ptr_ = planning_scene_monitor_->getRobotModel();
@@ -146,6 +150,13 @@ bool MoveitStateAdapter::initialize(const std::string& robot_description, const 
   group_name_ = group_name;
   tool_frame_ = tcp_frame;
   world_frame_ = world_frame;
+
+  std::vector<double> weights((int)robot_model_ptr_->getVariableCount(), 1);
+  setJointWeights(weights);
+  for (int i = 0; i < (int)robot_model_ptr_->getVariableCount();i++) {
+      ROS_INFO("%lf", weights[i]);
+      ROS_INFO_STREAM(robot_model_ptr_->getJointModelGroup(group_name_)->getJointModels()[i]);
+  }
 
   if (seed_states_.empty())
   {
